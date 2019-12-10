@@ -5,29 +5,29 @@
 using namespace std;
 
 fusion::fusion(){
-    w = sizeof(int)*8;
-    max_keys = pow(w,0.2);
-    if(max_keys < 2){
-        cout << "word size was : " << w << endl;
+    this->w = sizeof(int)*8;
+    this->max_keys = pow(this->w,0.2);
+    if(this->max_keys < 2){
+        cout << "word size was : " << this->w << endl;
         cout << "Minimum supported word size : 32" << endl;
         abort();
     }
-    root = new node(max_keys);
-    isleaf = true;
+    this->root = new node(max_keys);
 }
 
 void fusion::initialize(){
-    root->process();
+    this->root->process();
 }
 
 //bottom up
 void fusion::insert(int x){
-    insert(root,x,0);
+    insert(this->root,x,0);
 }
 
 //bottom up
 void fusion::insert(node * n,int x,int pos){
     if(n->isleaf){
+        cout << "inserting at leaf " << x << endl;
         leaf_insert(n,x);
         if(n->number_of_values > max_keys){
             if(n->parent == NULL){
@@ -50,7 +50,7 @@ void fusion::insert(node * n,int x,int pos){
                 b->number_of_values = max_keys-break_at;
                 n->number_of_values = n->number_of_values - b->number_of_values - 1;
                 b->isleaf = true;
-                root = a;
+                this->root = a;
             } else {
                 split_children(n->parent,pos);
             }
@@ -84,7 +84,7 @@ void fusion::insert(node * n,int x,int pos){
                 }
                 b->number_of_values = max_keys-break_at;
                 n->number_of_values = n->number_of_values - b->number_of_values - 1;
-                root = a;
+                this->root = a;
                 for(int j=n->number_of_values,k=0;j<b->number_of_values+1;j++,k++){
                     b->children.insert(b->children.begin()+k,n->children[j]);
                 }
@@ -98,32 +98,33 @@ void fusion::insert(node * n,int x,int pos){
 
 //bottom up
 void fusion::split_children(node * n,int pos){
-    node * a = new node(max_keys);
+    cout << "splitting" << endl;
+    node * a = new node(this->max_keys);
     node * b = n->children[pos];
     int break_at = b->number_of_values / 2 ;
-    for(int i=0;i<max_keys-break_at;i++){
+    for(int i=0;i<this->max_keys-break_at;i++){
         a->values.insert(a->values.begin()+i,b->values[b->number_of_values-break_at+i]);
     }
     a->isleaf = b->isleaf;
-    a->number_of_values = max_keys-break_at;
+    a->number_of_values = this->max_keys-break_at;
     b->number_of_values = b->number_of_values - a->number_of_values - 1;
     leaf_insert(n,b->values[break_at]);
-    n->children[pos+1] = a;
+    n->children.insert(n->children.begin()+pos+1,a);
     a->parent = n;
 }
 
 int fusion::successor(int x){
-    return successor(root,x);
+    return successor(this->root,x);
 }
 
 void fusion::leaf_insert(node * n,int x){
     int insert_at = 0;
-    for(;insert_at<n->number_of_values;insert_at++){
+    for(;insert_at< n->number_of_values ;insert_at++){
         if(x < n->values[insert_at]){
             break;
         }
     }
-    for(int i = n->number_of_values;i>insert_at;i--){
+    for(int i = n->number_of_values-1;i>insert_at;i--){
         n->values.insert(n->values.begin()+i+1,n->values[i]);
     }
     n->values.insert(n->values.begin()+insert_at,x);

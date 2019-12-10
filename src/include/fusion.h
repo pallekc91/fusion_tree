@@ -8,7 +8,6 @@ class fusion{
     int w;
     int max_keys;
     node * root;
-    bool isleaf;
 
     fusion();
     void initialize();
