@@ -27,11 +27,10 @@ void fusion::insert(int x){
 //bottom up
 void fusion::insert(node * n,int x,int pos){
     if(n->isleaf){
-        cout << "inserting at leaf " << x << endl;
         leaf_insert(n,x);
-        if(n->number_of_values > max_keys){
+        if(n->number_of_values > this->max_keys){
             if(n->parent == NULL){
-                node * a = new node(max_keys);
+                node * a = new node(this->max_keys);
                 a->parent = NULL;
                 a->number_of_values = 1;
                 a->children.insert(a->children.begin(),n);
@@ -41,13 +40,13 @@ void fusion::insert(node * n,int x,int pos){
                 int break_at = n->number_of_values/2;
                 a->values.insert(a->values.begin(),n->values[break_at]);
 
-                node * b = new node(max_keys);
+                node * b = new node(this->max_keys);
                 a->children.insert(a->children.begin()+1,b);
                 b->parent = a;
-                for(int i=0;i<max_keys-break_at;i++){
+                for(int i=0;i<this->max_keys-break_at;i++){
                     b->values.insert(b->values.begin()+i,n->values[n->number_of_values-break_at+i]);
                 }
-                b->number_of_values = max_keys-break_at;
+                b->number_of_values = this->max_keys-break_at;
                 n->number_of_values = n->number_of_values - b->number_of_values - 1;
                 b->isleaf = true;
                 this->root = a;
@@ -58,6 +57,9 @@ void fusion::insert(node * n,int x,int pos){
     } else {
         int i=0;
         for(;i<n->number_of_values;i++){
+            if(x == n->values[i]){
+                return;
+            }
             if(x < n->values[i]){
                 break;
             }
@@ -69,6 +71,7 @@ void fusion::insert(node * n,int x,int pos){
                 a->parent = NULL;
                 a->isleaf = false;
                 a->number_of_values = 1;
+
                 a->children.insert(a->children.begin(),n);
                 n->parent = a;
 
@@ -79,14 +82,16 @@ void fusion::insert(node * n,int x,int pos){
                 a->children.insert(a->children.begin()+1,b);
                 b->parent = a;
                 b->isleaf = n->isleaf;
-                for(int j=0;j<max_keys-break_at;j++){
+                for(int j=0;j<this->max_keys-break_at;j++){
                     b->values.insert(b->values.begin()+j,n->values[n->number_of_values-break_at+j]);
                 }
                 b->number_of_values = max_keys-break_at;
+                int n_prev_values = n->number_of_values;
                 n->number_of_values = n->number_of_values - b->number_of_values - 1;
                 this->root = a;
-                for(int j=n->number_of_values,k=0;j<b->number_of_values+1;j++,k++){
+                for(int j=n->number_of_values+1,k=0;j<n_prev_values+1;j++,k++){
                     b->children.insert(b->children.begin()+k,n->children[j]);
+                    b->children[k]->parent = b;
                 }
             } else {
                 split_children(n->parent,pos);
@@ -98,17 +103,26 @@ void fusion::insert(node * n,int x,int pos){
 
 //bottom up
 void fusion::split_children(node * n,int pos){
-    cout << "splitting" << endl;
     node * a = new node(this->max_keys);
     node * b = n->children[pos];
     int break_at = b->number_of_values / 2 ;
     for(int i=0;i<this->max_keys-break_at;i++){
         a->values.insert(a->values.begin()+i,b->values[b->number_of_values-break_at+i]);
     }
+    if(!b->isleaf){
+        for(int i=break_at+1,j=0;i<b->number_of_values+1;i++,j++){
+            a->children.insert(a->children.begin()+j,b->children[i]);
+            a->children[j]->parent = a;
+        }
+    }
     a->isleaf = b->isleaf;
     a->number_of_values = this->max_keys-break_at;
     b->number_of_values = b->number_of_values - a->number_of_values - 1;
+    int prev_values_n = n->number_of_values;
     leaf_insert(n,b->values[break_at]);
+    for(int i = prev_values_n;i==pos;i--){
+        n->children.insert(n->children.begin()+i+1,n->children[i]);
+    }
     n->children.insert(n->children.begin()+pos+1,a);
     a->parent = n;
 }
@@ -120,6 +134,9 @@ int fusion::successor(int x){
 void fusion::leaf_insert(node * n,int x){
     int insert_at = 0;
     for(;insert_at< n->number_of_values ;insert_at++){
+        if(x == n->values[insert_at]){
+            return;
+        }
         if(x < n->values[insert_at]){
             break;
         }
@@ -132,26 +149,27 @@ void fusion::leaf_insert(node * n,int x){
 }
 
 int fusion::successor(node *n,int x){
-    if(n->number_of_values == 0) {
-        if(n->isleaf){
-            return -1;
-        }
-        return successor(n->children[0], x);
-    }
     int i = n->parallel_compare(x);
-    int msb = (sizeof(int)*8) - __builtin_clz(x^n->values[i])-1;
-    if(i != 0){
-        int msb_ = (sizeof(int)*8) - __builtin_clz(x^n->values[i-1])-1;
-        msb = max(msb,msb_);
+    int msb = 0;
+    if(i < n->number_of_values){
+        int pos_match = x ^ n->values[i];
+        msb = __builtin_clz(pos_match);
     }
-
+    if(i != 0){
+        int pos_match_prev = x ^ n->values[i-1];
+        msb = max(msb,__builtin_clz(pos_match_prev));
+    }
     //making the largest value before x
     msb = (sizeof(int)*8) - msb - 1;
     int temp_mask = (int(1) << msb) - 1;
+    int temp_mask_ = (int(1) << msb) ^ int(-1);
     int result = x | temp_mask;
+
     if((int(1) <<  msb) & x){
-        int temp_mask2 = (int(1) << msb) ^ int(-1);
-        result &= temp_mask2;
+        result &= temp_mask_;
+    } else {
+        result &= int(-1) ^ temp_mask; //((E(1) << (y))-1);
+        result |= (int(1)<<msb);
     }
     int j = n->parallel_compare(result);
     //miniature testcase and correction if fails
@@ -159,10 +177,19 @@ int fusion::successor(node *n,int x){
         j++;
     }
     if(n->isleaf){
-        if(j == n->number_of_values){
+        if(j >= n->number_of_values){
             return -1;
         }
         return n->values[j];
     }
-    return successor(n->children[i],x);
+    int successor_from_child = successor(n->children[j],x);
+    if(successor_from_child == -1){
+        if(j >= n->number_of_values){
+            return successor_from_child;
+        } else {
+            return n->values[j];
+        }
+    } else {
+        return successor_from_child;
+    }
 }
